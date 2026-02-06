@@ -1,24 +1,37 @@
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * PROJECT: Crime Reporting & Deep Learning Paper Analyzer
+ *
+ * This class handles the high-level architecture:
+ * 1. Simulates the Search Engine Results (SERP) by defining URLs.
+ * 2. Manages the Thread Pool to fetch pages in parallel (Multithreading).
+ * 3. Aggregates results from all threads.
+ * 4. Triggers the Visualization (GUI).
+ */
 public class Main {
 
     public static void main(String[] args) throws InterruptedException, ExecutionException {
-        // --- STEP 1: USER QUERY / SERP LOADER ---
-        // Since we can't scrape Google directly in a student project without getting blocked,
-        // we simulate the SERP result with a list of specific Wikipedia/Journal URLs.
+
+        // =============================================================
+        // STEP 1: USER QUERY / SERP LOADER
+        // =============================================================
+        // NOTE: We simulate Google SERP results here using a fixed list of URLs.
+        // This is done to avoid IP bans and CAPTCHA blocks associated with
+        // scraping live search engines during a student demonstration.
 
         List<String> crimeUrls = Arrays.asList(
-                "https://en.wikipedia.org/wiki/Crime_statistics",       // Fixed link
+                "https://en.wikipedia.org/wiki/Crime_statistics",
                 "https://en.wikipedia.org/wiki/Police_procedural",
                 "https://en.wikipedia.org/wiki/First_Information_Report",
                 "https://en.wikipedia.org/wiki/Forensic_science",
                 "https://en.wikipedia.org/wiki/Criminal_investigation",
-                "https://en.wikipedia.org/wiki/Uniform_Crime_Reports",  // Added another valid one
-                "https://en.wikipedia.org/wiki/CompStat",               // Added another valid one
-                "https://en.wikipedia.org/wiki/Criminal_justice",       // Added another valid one
-                "https://en.wikipedia.org/wiki/Criminology",            // Added another valid one
-                "https://en.wikipedia.org/wiki/Offender_profiling"      // Added another valid one
+                "https://en.wikipedia.org/wiki/Uniform_Crime_Reports",
+                "https://en.wikipedia.org/wiki/CompStat",
+                "https://en.wikipedia.org/wiki/Criminal_justice",
+                "https://en.wikipedia.org/wiki/Criminology",
+                "https://en.wikipedia.org/wiki/Offender_profiling"
         );
 
         List<String> deepLearningUrls = Arrays.asList(
@@ -28,33 +41,44 @@ public class Main {
                 "https://en.wikipedia.org/wiki/Transformer_(machine_learning)"
         );
 
-        // --- STEP 2: THREAD POOL CONFIGURATION ---
+        // =============================================================
+        // STEP 2: THREAD POOL CONFIGURATION (Concurrency)
+        // =============================================================
+        // We calculate the number of available CPU cores to optimize performance.
         int cores = Runtime.getRuntime().availableProcessors();
+
+        // ExecutorService is used to manage a pool of threads.
+        // This allows us to fetch multiple websites simultaneously.
         ExecutorService threadPool = Executors.newFixedThreadPool(cores);
         System.out.println("Starting Thread Pool with " + cores + " threads...");
 
-        // --- STEP 3: EXECUTION & TEXT PROCESSING ---
-        // We create lists of Future objects to hold the results once threads finish
+        // =============================================================
+        // STEP 3: EXECUTION & TEXT PROCESSING
+        // =============================================================
+        // 'Future' objects are placeholders for data that isn't ready yet.
+        // They allow the main thread to continue working while the network threads fetch data.
         List<Future<PaperAnalysisTask.Result>> crimeFutures = new ArrayList<>();
         List<Future<PaperAnalysisTask.Result>> dlFutures = new ArrayList<>();
 
-        // Submit Crime Tasks
+        // Submit tasks to the thread pool
         for (String url : crimeUrls) {
             crimeFutures.add(threadPool.submit(new PaperAnalysisTask(url, "CRIME")));
         }
 
-        // Submit Deep Learning Tasks
         for (String url : deepLearningUrls) {
             dlFutures.add(threadPool.submit(new PaperAnalysisTask(url, "DEEP_LEARNING")));
         }
 
-        // --- STEP 4: COUNTING & CATEGORIZATION ---
+        // =============================================================
+        // STEP 4: DATA AGGREGATION
+        // =============================================================
         Map<String, Integer> crimeStats = new HashMap<>();
         Map<String, Integer> dlSubHeadingStats = new HashMap<>();
 
-        // Aggregate Crime Results
+        // Collect results for Crime Papers
         for (Future<PaperAnalysisTask.Result> f : crimeFutures) {
-            PaperAnalysisTask.Result res = f.get(); // This waits for the thread to finish
+            // f.get() blocks the main thread until the specific download is complete
+            PaperAnalysisTask.Result res = f.get();
             if (res != null) {
                 for (String feature : res.itemsFound) {
                     crimeStats.put(feature, crimeStats.getOrDefault(feature, 0) + 1);
@@ -62,37 +86,32 @@ public class Main {
             }
         }
 
-        // Aggregate Deep Learning Results
+        // Collect results for Deep Learning Papers
         for (Future<PaperAnalysisTask.Result> f : dlFutures) {
             PaperAnalysisTask.Result res = f.get();
             if (res != null) {
                 for (String heading : res.itemsFound) {
-                    // Count specific interesting headers or all of them
-                    // For visualization clarity, let's group some common ones:
+                    // Clean up: Truncate very long headers so the chart looks neat
                     String cleanHeading = heading.length() > 15 ? heading.substring(0, 15) + "..." : heading;
                     dlSubHeadingStats.put(cleanHeading, dlSubHeadingStats.getOrDefault(cleanHeading, 0) + 1);
                 }
             }
         }
 
-        threadPool.shutdown(); // Always shut down the pool!
+        // Important: Always shut down the thread pool or the program will never exit!
+        threadPool.shutdown();
 
-        // --- STEP 5: VISUALIZATION ---
-        // Run GUI code on the Event Dispatch Thread
-//        javax.swing.SwingUtilities.invokeLater(() -> {
-//            SimpleBarChart.showChart(crimeStats, "Distinctive Features in Crime Reporting Papers");
-//
-//            // Note: Journal subheadings might be too many to show all, so we can filter top 5
-//            SimpleBarChart.showChart(dlSubHeadingStats, "Sub-headings in Deep Learning Papers");
-//        });
-
+        // =============================================================
+        // STEP 5: VISUALIZATION
+        // =============================================================
+        // We run the GUI updates on the Event Dispatch Thread to ensure thread safety.
         javax.swing.SwingUtilities.invokeLater(() -> {
 
-            // Graph 1: Crime Features (This one is already fine)
+            // Graph 1: Crime Features
             SimpleBarChart.showChart(crimeStats, "Distinctive Features in Crime Papers");
 
-            // Graph 2: Deep Learning Sub-headings (FIXED to show only Top 10)
-            // We use a stream to sort by count (highest first) and pick the top 10
+            // Graph 2: Deep Learning Sub-headings (Top 10 Filter)
+            // We use a Stream to sort the data by frequency (highest to lowest) and pick the top 10.
             Map<String, Integer> top10Headings = new LinkedHashMap<>();
 
             dlSubHeadingStats.entrySet().stream()
