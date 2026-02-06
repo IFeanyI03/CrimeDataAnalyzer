@@ -1,0 +1,23 @@
+# --- IntelliJ IDEA (Critical to ignore) ---
+.idea/
+*.iml
+*.iws
+out/
+
+# --- Java Compiled Files ---
+*.class
+*.log
+*.ctxt
+
+# --- OS Junk Files ---
+.DS_Store
+Thumbs.db
+
+# --- Executable / Artifacts ---
+# Ignore the build folder for the JAR
+/artifacts/
+
+# --- LIBRARIES (IMPORTANT) ---
+# We explicitly want to KEEP the lib folder so your
+# teammates get the jsoup-1.22.1.jar automatically.
+!lib/
